@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Extraction System | Internal Tool</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-shield-alt"></i>
+            <span>Secure Email Extractor</span>
+            <span class="badge">INTERNAL USE ONLY</span>
+        </div>
+        <div class="nav-status" id="systemStatus">
+            <i class="fas fa-server"></i> System: <span id="health-indicator">Checking...</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        
+        <header class="page-header">
+            <h1>Lead Generation Dashboard</h1>
+            <p>Paste raw text or URLs below to securely extract business contacts.</p>
+        </header>
+
+        <div class="dashboard-grid">
+            
+            <div class="card extraction-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-search"></i> New Extraction Job</h2>
+                </div>
+                <div class="card-body">
+                    <form id="extractForm">
+                        <div class="form-group">
+                            <label for="inputData">Target Data (URLs or Text)</label>
+                            <textarea id="inputData" rows="6" placeholder="Paste Google Search results or list of URLs here..." required></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label for="scanMode">Scan Depth</label>
+                                <select id="scanMode">
+                                    <option value="quick">Quick Scan (Homepage Only)</option>
+                                    <option value="deep">Deep Scan (Follow Links)</option>
+                                </select>
+                            </div>
+                            <div class="form-group half checkboxes">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="respectRobots" checked>
+                                    <span class="checkmark"></span>
+                                    Respect robots.txt
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="aiEnable">
+                                    <span class="checkmark"></span>
+                                    Enable AI Filtering
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="startBtn">
+                            <i class="fas fa-play"></i> Start Extraction
+                        </button>
+                    </form>
+
+                    <div id="jobStatusContainer" class="status-box hidden">
+                        <div class="status-header">
+                            <span class="status-title">Active Job: <span id="currentJobId" class="mono">...</span></span>
+                            <span id="statusBadge" class="badge-status pending">Queued</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="progressBar"></div>
+                        </div>
+                        <p id="statusMessage" class="status-text">Initializing...</p>
+                        
+                        <div id="secureCredentials" class="secure-box hidden">
+                            <h3><i class="fas fa-lock"></i> Extraction Complete</h3>
+                            <p>Save these credentials immediately. They are required to decrypt the file.</p>
+                            
+                            <div class="credential-row">
+                                <label>File ID:</label>
+                                <div class="copy-input">
+                                    <input type="text" id="resultFileId" readonly>
+                                    <button class="btn-icon" onclick="copyToClipboard('resultFileId')"><i class="fas fa-copy"></i></button>
+                                </div>
+                            </div>
+                            
+                            <div class="credential-row">
+                                <label>Passphrase:</label>
+                                <div class="copy-input">
+                                    <input type="text" id="resultPassphrase" readonly class="text-danger">
+                                    <button class="btn-icon" onclick="copyToClipboard('resultPassphrase')"><i class="fas fa-copy"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card decryption-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-file-export"></i> Decrypt & Download</h2>
+                </div>
+                <div class="card-body">
+                    <p class="helper-text">Enter the File ID and Passphrase generated from a completed job to access the encrypted CSV.</p>
+                    
+                    <form id="decryptForm">
+                        <div class="form-group">
+                            <label for="decryptFileId">File ID</label>
+                            <input type="text" id="decryptFileId" placeholder="e.g., a1b2c3d4..." required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="decryptPassphrase">Secure Passphrase</label>
+                            <input type="password" id="decryptPassphrase" placeholder="Paste the generated key here" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-success" id="decryptBtn">
+                            <i class="fas fa-unlock"></i> Decrypt & Download
+                        </button>
+                    </form>
+                    
+                    <div id="downloadMessage" class="status-text mt-2"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

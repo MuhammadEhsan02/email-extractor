@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # --- Backend API ---
+  backend:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: email_extractor_backend
+    volumes:
+      # Persist logs and storage outside the container
+      - ./backend/app/storage:/app/app/storage
+      - ./backend/app/logs:/app/app/logs
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=docker_dev_secret
+      - LOG_LEVEL=INFO
+      - BACKEND_CORS_ORIGINS=["*"]
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  # --- Frontend UI ---
+  frontend:
+    image: nginx:alpine
+    container_name: email_extractor_frontend
+    volumes:
+      # Map the local frontend folder to Nginx's web root
+      - ./frontend:/usr/share/nginx/html
+    ports:
+      - "3000:80"
+    networks:
+      - app_network
+    depends_on:
+      - backend
+
+networks:
+  app_network:
+    driver: bridge

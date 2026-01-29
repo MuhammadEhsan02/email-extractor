@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+
+# Environment Variables (Critical Security)
+.env
+.env.prod
+
+# Docker
+.docker/
+
+# --- Application Storage (Runtime Data) ---
+# Ignore all generated files...
+backend/app/storage/temp_html/*
+backend/app/storage/encrypted_files/*
+backend/app/storage/decrypted_files/*
+backend/app/logs/*
+
+# ...but keep the directory structure
+!backend/app/storage/temp_html/.gitkeep
+!backend/app/storage/encrypted_files/.gitkeep
+!backend/app/storage/decrypted_files/.gitkeep
+!backend/app/logs/.gitkeep
+
+# IDE Settings
+.vscode/
+.idea/
+*.swp

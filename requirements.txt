@@ -1,0 +1,26 @@
+# Web Framework
+fastapi==0.104.0
+uvicorn[standard]==0.23.2
+python-multipart==0.0.6
+
+# HTTP Client & Async
+aiohttp==3.8.6
+requests==2.31.0
+
+# Data Parsing & Extraction
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Configuration & Validation
+pydantic==2.4.2
+pydantic-settings==2.0.3
+
+# Cryptography & Security
+cryptography==41.0.4
+
+# File Formats
+openpyxl==3.1.2  # For Excel generation
+
+# Testing
+pytest==7.4.2
+httpx==0.25.0    # Required for FastAPI TestClient
