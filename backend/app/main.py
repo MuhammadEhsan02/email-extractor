@@ -1,52 +1,29 @@
-import logging
-import sys
-import time
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+import os
+import logging
 
-# Import Configuration
 from app.config import settings
-
-# Import Routes
 from app.routes import api_router
 
-# --- 1. Logging Configuration ---
-# Configure the root logger to write to both Console and File
-logger = logging.getLogger()
-logger.setLevel(settings.LOG_LEVEL)
+# Configure Logging
+logging.basicConfig(
+    level=settings.LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-# Formatter: timestamp - module - level - message
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-# Handler A: Console (stdout)
-stream_handler = logging.StreamHandler(sys.stdout)
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
-
-# Handler B: File (backend/app/logs/app.log)
-file_handler = logging.FileHandler(settings.LOG_FILE)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-
-# --- 2. Application Factory ---
 def create_application() -> FastAPI:
-    """
-    Initialize and configure the FastAPI application.
-    """
-    app = FastAPI(
+    application = FastAPI(
         title=settings.PROJECT_NAME,
-        version=settings.VERSION,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
         docs_url=f"{settings.API_V1_STR}/docs",
-        description="Secure, internal-only email extraction tool."
     )
 
-    # --- Middleware: CORS ---
-    # Required for the frontend to fetch data from the backend
+    # Set all CORS enabled origins
     if settings.BACKEND_CORS_ORIGINS:
-        app.add_middleware(
+        application.add_middleware(
             CORSMiddleware,
             allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
             allow_credentials=True,
@@ -54,46 +31,22 @@ def create_application() -> FastAPI:
             allow_headers=["*"],
         )
 
-    # --- Middleware: Process Timer (Optional but useful for debugging) ---
-    @app.middleware("http")
-    async def add_process_time_header(request: Request, call_next):
-        start_time = time.time()
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        response.headers["X-Process-Time"] = str(process_time)
-        return response
+    # Include API Routes
+    application.include_router(api_router, prefix=settings.API_V1_STR)
 
-    # --- Register Routes ---
-    # Includes /extract, /decrypt, /health under /api/v1
-    app.include_router(api_router, prefix=settings.API_V1_STR)
+    # --- MOUNT FRONTEND (The Fix) ---
+    # This points to the /app/frontend folder inside Docker
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    # Go up two levels from /app/backend/app -> /app/frontend
+    frontend_path = os.path.join(current_dir, "../../frontend")
+    
+    # Mount the frontend to the root "/" so it loads index.html
+    if os.path.exists(frontend_path):
+        application.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+        logger.info(f"Frontend mounted successfully from {frontend_path}")
+    else:
+        logger.warning(f"Frontend directory not found at {frontend_path}")
 
-    return app
+    return application
 
-# Create the app instance
 app = create_application()
-
-# --- 3. Lifecycle Events ---
-@app.on_event("startup")
-async def startup_event():
-    """
-    Executed when the server starts.
-    """
-    logging.info("--- Email Extraction System Starting Up ---")
-    logging.info(f"Storage Root: {settings.STORAGE_DIR}")
-    logging.info(f"Logs Path:    {settings.LOG_FILE}")
-    logging.info("System Ready.")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """
-    Executed when the server shuts down.
-    """
-    logging.info("--- Email Extraction System Shutting Down ---")
-
-# --- Root Endpoint (Sanity Check) ---
-@app.get("/", tags=["Root"])
-async def root():
-    return {
-        "message": "Email Extraction System API is running.",
-        "docs": f"{settings.API_V1_STR}/docs"
-    }
