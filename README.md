@@ -57,6 +57,24 @@ Designed with a focus on privacy (AES-256 encryption), scalability (Docker), and
 5. **Run the frontend:**
     Open `frontend/index.html` in your browser (or use a simple server like Live Server).
 
+### Running as a Windows Executable (PyInstaller)
+
+1. **Install PyInstaller:**
+
+    ```bash
+    pip install pyinstaller
+    ```
+
+2. **Build the executable:**
+
+    ```bash
+    python build_exe.py
+    ```
+
+3. **Run the application:**
+    * Double-click on `dist/EmailExtractionSystem/EmailExtractionSystem.exe`.
+    * A terminal will launch the backend server, and your default web browser will automatically open to `http://127.0.0.1:8000`.
+
 ## Project Structure
 
 * `backend/` - FastAPI application logic.
