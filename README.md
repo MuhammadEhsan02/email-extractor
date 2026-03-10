@@ -15,7 +15,7 @@ Designed with a focus on privacy (AES-256 encryption), scalability (Docker), and
 1. **Clone the repository:**
 
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/MuhammadEhsan02/email-extractor
     cd email-extraction-system
     ```
 
