@@ -3,7 +3,7 @@
  * Handles API communication for Job Submission, Status Polling, and File Decryption.
  */
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = '/api/v1';
 
 // DOM Elements
 const elements = {

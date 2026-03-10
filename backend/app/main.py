@@ -35,10 +35,15 @@ def create_application() -> FastAPI:
     application.include_router(api_router, prefix=settings.API_V1_STR)
 
     # --- MOUNT FRONTEND (The Fix) ---
-    # This points to the /app/frontend folder inside Docker
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    # Go up two levels from /app/backend/app -> /app/frontend
-    frontend_path = os.path.join(current_dir, "../../frontend")
+    import sys
+    from pathlib import Path
+    
+    # This securely resolves the correct path when running via uvicorn directly or pyinstaller exe
+    if hasattr(sys, '_MEIPASS'):
+        frontend_path = os.path.join(sys._MEIPASS, "frontend")
+    else:
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        frontend_path = os.path.join(current_dir, "../../frontend")
     
     # Mount the frontend to the root "/" so it loads index.html
     if os.path.exists(frontend_path):

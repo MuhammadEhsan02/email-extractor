@@ -25,24 +25,52 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     # --- Directory Hierarchy (Absolute Paths) ---
-    # backend/app/
-    BASE_DIR: Path = Path(__file__).resolve().parent
+    # PyInstaller Path Resolution
+    # When frozen, files are extracted to sys._MEIPASS.
+    # Otherwise, we use the normal development structure.
+    @property
+    def BASE_DIR(self) -> Path:
+        import sys
+        if hasattr(sys, '_MEIPASS'):
+            return Path(sys._MEIPASS)
+        return Path(__file__).resolve().parent
     
+    # Store settings in a persistent user directory when frozen
+    @property
+    def USER_DATA_DIR(self) -> Path:
+        import sys
+        if hasattr(sys, '_MEIPASS'):
+            return Path.home() / ".email-extractor-tool"
+        return self.BASE_DIR
+
     # backend/app/storage/
-    STORAGE_DIR: Path = BASE_DIR / "storage"
+    @property
+    def STORAGE_DIR(self) -> Path:
+        return self.USER_DATA_DIR / "storage"
     
     # backend/app/storage/temp_html/
-    TEMP_HTML_DIR: Path = STORAGE_DIR / "temp_html"
+    @property
+    def TEMP_HTML_DIR(self) -> Path:
+        return self.STORAGE_DIR / "temp_html"
     
     # backend/app/storage/encrypted_files/
-    ENCRYPTED_DIR: Path = STORAGE_DIR / "encrypted_files"
+    @property
+    def ENCRYPTED_DIR(self) -> Path:
+        return self.STORAGE_DIR / "encrypted_files"
     
     # backend/app/storage/decrypted_files/ (Internal Use Only)
-    DECRYPTED_DIR: Path = STORAGE_DIR / "decrypted_files"
+    @property
+    def DECRYPTED_DIR(self) -> Path:
+        return self.STORAGE_DIR / "decrypted_files"
     
     # backend/app/logs/
-    LOG_DIR: Path = BASE_DIR / "logs"
-    LOG_FILE: Path = LOG_DIR / "app.log"
+    @property
+    def LOG_DIR(self) -> Path:
+        return self.USER_DATA_DIR / "logs"
+
+    @property
+    def LOG_FILE(self) -> Path:
+        return self.LOG_DIR / "app.log"
     
     # --- Logging Settings ---
     LOG_LEVEL: str = "INFO"
