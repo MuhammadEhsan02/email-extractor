@@ -93,6 +93,18 @@ class EmailCategorizer:
         'government': ['gov', 'government', 'municipal', 'state', 'federal']
     }
     
+    # Business type indicators for website text categorization
+    BUSINESS_TYPES_KEYWORDS = {
+        'bakery': ['bakery', 'baker', 'pastry', 'cake', 'bread', 'croissant', 'cookies', 'baking', 'patisserie'],
+        'hotel': ['hotel', 'motel', 'resort', 'inn', 'hostel', 'suites', 'accommodation', 'booking', 'rooms'],
+        'clothing': ['clothing', 'apparel', 'boutique', 'fashion', 'garment', 'dresses', 'menswear', 'womenswear', 'shirts'],
+        'restaurant': ['restaurant', 'cafe', 'diner', 'menu', 'food', 'dining', 'kitchen', 'eatery', 'bistro'],
+        'real_estate': ['real estate', 'realtor', 'property', 'properties', 'apartments', 'housing', 'mortgage', 'broker', 'listings'],
+        'tech': ['software', 'technology', 'tech', 'app', 'platform', 'cloud', 'saas', 'development', 'it services'],
+        'medical': ['clinic', 'hospital', 'medical', 'doctor', 'patient', 'health', 'healthcare', 'care', 'treatment'],
+        'fitness': ['gym', 'fitness', 'workout', 'training', 'yoga', 'pilates', 'health club', 'exercise']
+    }
+    
     def __init__(self, 
                  use_ai: bool = False,
                  min_confidence: float = 0.5):
@@ -223,6 +235,33 @@ class EmailCategorizer:
         categories.sort(key=lambda x: x.confidence, reverse=True)
         
         return categories
+    
+    def predict_business_type(self, website_text: str) -> str:
+        """
+        Scan parsed HTML text to predict business type.
+        Returns the most likely business label or 'unknown' if none found.
+        """
+        if not website_text:
+            return 'unknown'
+            
+        text_lower = website_text.lower()
+        best_score = 0
+        best_label = 'unknown'
+        
+        for category, keywords in self.BUSINESS_TYPES_KEYWORDS.items():
+            score = 0
+            for keyword in keywords:
+                # Use regex strictly to find word boundaries for accuracy
+                pattern = r'\b' + re.escape(keyword) + r'\b'
+                score += len(re.findall(pattern, text_lower))
+                
+            if score > best_score:
+                best_score = score
+                best_label = category
+                
+        if best_score > 0:
+            return best_label
+        return 'unknown'
     
     def batch_categorize(self, emails: List[str]) -> Dict[str, List[Category]]:
         """

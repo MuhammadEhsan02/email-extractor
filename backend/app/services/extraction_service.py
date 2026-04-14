@@ -13,6 +13,7 @@ from app.core.url_extractor import extract_urls as core_extract_urls
 from app.core.scraper import WebScraper
 from app.core.parser import HTMLParser
 from app.core.email_extractor import EmailExtractor
+from app.core.categorizer import EmailCategorizer
 from app.core.limiter import LimitEnforcer, LimitConfig
 from app.core.file_generator import EmailFileGenerator
 from app.core.utils import is_valid_url
@@ -92,6 +93,7 @@ class ExtractionService:
             # Using core/parser.py and core/email_extractor.py
             parser = HTMLParser()
             extractor = EmailExtractor(min_confidence=request.ai_settings.min_confidence)
+            categorizer = EmailCategorizer()
 
             extracted_data = []
 
@@ -104,27 +106,42 @@ class ExtractionService:
                     # Parse HTML
                     parsed_content = parser.parse(result.html, base_url=result.url)
                     
-                    # Extract Emails
-                    emails = extractor.extract(parsed_content.text)
+                    # Extract Contacts
+                    contacts = extractor.extract(parsed_content.text)
+                    business_label = categorizer.predict_business_type(parsed_content.text)
+                    phones_str = ", ".join(contacts.phone_numbers)
                     
-                    for email_info in emails:
+                    if not contacts.emails and contacts.phone_numbers:
                         extracted_data.append({
-                            "email": email_info.email,
+                            "email": "",
                             "source_url": result.url,
-                            "domain": email_info.domain,
-                            "confidence": email_info.confidence_score,
-                            "context": email_info.source_context[:100] if email_info.source_context else ""
+                            "domain": result.url,
+                            "confidence": 0.0,
+                            "context": "",
+                            "phone_numbers": phones_str,
+                            "business_label": business_label
                         })
+                    else:
+                        for email_info in contacts.emails:
+                            extracted_data.append({
+                                "email": email_info.email,
+                                "source_url": result.url,
+                                "domain": email_info.domain,
+                                "confidence": email_info.confidence_score,
+                                "context": email_info.source_context[:100] if email_info.source_context else "",
+                                "phone_numbers": phones_str,
+                                "business_label": business_label
+                            })
                     
                     # Log success for limiter
                     limiter.record_success(result.url, len(result.html))
                 else:
                     limiter.record_failure(result.url, result.error or "Unknown error")
 
-            logger.info(f"Job {job_id}: Extracted {len(extracted_data)} emails.")
+            logger.info(f"Job {job_id}: Extracted {len(extracted_data)} contacts.")
 
             if not extracted_data:
-                raise ValueError("No emails could be extracted from the provided URLs.")
+                raise ValueError("No contacts could be extracted from the provided URLs.")
 
             # [cite_start]5. Generate Output File (CSV/Excel) [cite: 24]
             # Using core/file_generator.py
@@ -134,15 +151,15 @@ class ExtractionService:
             temp_dir = self.file_service.temp_dir
             raw_filename_base = f"job_{job_id}"
             
-            # We default to CSV for the internal generation before encryption
+            # Generation format before encryption
             generated_files = generator.generate_output(
                 emails=extracted_data,
                 output_dir=str(temp_dir),
                 filename_prefix=raw_filename_base,
-                formats=['csv'] # Generate CSV first
+                formats=['xlsx'] # Generate Excel
             )
             
-            raw_file_path = generated_files.get('csv')
+            raw_file_path = generated_files.get('xlsx')
             if not raw_file_path:
                 raise Exception("Failed to generate output file.")
             
@@ -165,7 +182,7 @@ class ExtractionService:
             # 7. Update Job Status
             JOB_STORE[job_id]["status"] = JobStatus.COMPLETED
             JOB_STORE[job_id]["result_summary"] = {
-                "emails_found": len(extracted_data),
+                "contacts_found": len(extracted_data),
                 "encrypted_file_id": job_id
             }
             # IMPORTANT: Storing the passphrase in memory for the demo.

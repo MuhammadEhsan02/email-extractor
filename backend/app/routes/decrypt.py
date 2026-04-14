@@ -61,15 +61,15 @@ async def decrypt_file(
                 detail="Decryption failed. Output file was not generated."
             )
 
-        # 3. Determine filename for download (e.g., results.csv)
-        filename = os.path.basename(temp_decrypted_path)
+        # 3. Determine filename for download (e.g., results.xlsx)
+        filename = "extracted_contacts.xlsx"
 
         # 4. Return FileResponse
         # background=file_service.cleanup matches FastAPI's way to run code after response
         return FileResponse(
             path=temp_decrypted_path,
             filename=filename,
-            media_type='application/octet-stream',
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             background=file_service.create_cleanup_task(temp_decrypted_path)
         )
 

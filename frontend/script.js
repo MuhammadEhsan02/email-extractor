@@ -107,7 +107,7 @@ elements.decryptForm.addEventListener('submit', async (e) => {
         
         // Extract filename from headers if possible, else default
         const contentDisp = response.headers.get('Content-Disposition');
-        let fileName = 'extracted_emails.csv';
+        let fileName = 'extracted_contacts.xlsx';
         if (contentDisp && contentDisp.includes('filename=')) {
             fileName = contentDisp.split('filename=')[1].replace(/"/g, '');
         }

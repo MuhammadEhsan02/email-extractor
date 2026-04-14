@@ -28,6 +28,13 @@ class EmailInfo:
     source_context: Optional[str] = None
 
 
+@dataclass
+class ContactInfo:
+    """Container for all contacts extracted from text."""
+    emails: List[EmailInfo]
+    phone_numbers: List[str]
+
+
 class EmailExtractor:
     """
     Extracts and validates email addresses from text.
@@ -43,6 +50,12 @@ class EmailExtractor:
         r'[A-Za-z0-9.-]*'  # Domain can contain these
         r'\.[A-Za-z]{2,}'  # Must end with TLD (2+ chars)
         r'\b',
+        re.IGNORECASE
+    )
+
+    # Standard international/local phone number pattern
+    PHONE_PATTERN = re.compile(
+        r'(?:(?:\+?\d{1,3}[-.\s]*)|(?:\(\d{1,4}\)[-.\s]*))?\d{3,4}[-.\s]*\d{3,4}[-.\s]*\d{4}',
         re.IGNORECASE
     )
 
@@ -62,15 +75,15 @@ class EmailExtractor:
         self.min_confidence = min_confidence
         self.remove_duplicates = remove_duplicates
 
-    def extract(self, text: str) -> List[EmailInfo]:
+    def extract(self, text: str) -> ContactInfo:
         """
         Main extraction method.
         1. Clean and de-obfuscate text.
-        2. Run Regex.
+        2. Run Regex for emails and phones.
         3. Validate and Score results.
         """
         if not text:
-            return []
+            return ContactInfo(emails=[], phone_numbers=[])
 
         # --- STEP 1: De-obfuscation ---
         # Convert "name [at] domain [dot] com" -> "name@domain.com"
@@ -113,7 +126,24 @@ class EmailExtractor:
                 candidates.append(info)
                 seen_emails.add(email_str)
 
-        return candidates
+        # --- STEP 3: Phone Regex Matching ---
+        raw_phones = self.PHONE_PATTERN.finditer(clean_text)
+        phones = []
+        seen_phones = set()
+
+        for match in raw_phones:
+            phone_str = match.group(0).strip()
+            
+            # Simple validation to avoid matching purely random IDs (must have enough digits)
+            digit_count = sum(c.isdigit() for c in phone_str)
+            if digit_count < 10 or digit_count > 15:
+                continue
+                
+            if phone_str not in seen_phones:
+                phones.append(phone_str)
+                seen_phones.add(phone_str)
+
+        return ContactInfo(emails=candidates, phone_numbers=phones)
 
     def _deobfuscate(self, text: str) -> str:
         """
