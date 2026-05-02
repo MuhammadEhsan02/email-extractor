@@ -10,7 +10,7 @@ Author: Email Extraction System
 
 import re
 from typing import List, Set, Dict, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import Counter
 import logging
 
@@ -33,6 +33,7 @@ class ContactInfo:
     """Container for all contacts extracted from text."""
     emails: List[EmailInfo]
     phone_numbers: List[str]
+    social_links: Dict[str, str] = field(default_factory=dict)
 
 
 class EmailExtractor:
@@ -55,7 +56,13 @@ class EmailExtractor:
 
     # Standard international/local phone number pattern
     PHONE_PATTERN = re.compile(
-        r'(?:(?:\+?\d{1,3}[-.\s]*)|(?:\(\d{1,4}\)[-.\s]*))?\d{3,4}[-.\s]*\d{3,4}[-.\s]*\d{4}',
+        r'(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]?\d{3,4}',
+        re.IGNORECASE
+    )
+
+    # Social media domains to extract
+    SOCIAL_PATTERN = re.compile(
+        r'(?:https?:\/\/)?(?:www\.)?(facebook\.com|twitter\.com|x\.com|instagram\.com|linkedin\.com|wa\.me)\/[A-Za-z0-9_.-]+',
         re.IGNORECASE
     )
 
@@ -75,19 +82,20 @@ class EmailExtractor:
         self.min_confidence = min_confidence
         self.remove_duplicates = remove_duplicates
 
-    def extract(self, text: str) -> ContactInfo:
+    def extract(self, text: str, html_content: Optional[str] = None) -> ContactInfo:
         """
         Main extraction method.
         1. Clean and de-obfuscate text.
         2. Run Regex for emails and phones.
         3. Validate and Score results.
         """
-        if not text:
+        if not text and not html_content:
             return ContactInfo(emails=[], phone_numbers=[])
 
+        text_to_process = text or ""
         # --- STEP 1: De-obfuscation ---
         # Convert "name [at] domain [dot] com" -> "name@domain.com"
-        clean_text = self._deobfuscate(text)
+        clean_text = self._deobfuscate(text_to_process)
 
         # --- STEP 2: Regex Matching ---
         raw_matches = self.EMAIL_PATTERN.finditer(clean_text)
@@ -126,6 +134,29 @@ class EmailExtractor:
                 candidates.append(info)
                 seen_emails.add(email_str)
 
+        # Check HTML for mailto: links specifically
+        if html_content:
+            mailto_matches = re.finditer(r'href="mailto:([^"\'\?]+)', html_content, re.IGNORECASE)
+            for match in mailto_matches:
+                email_str = match.group(1).lower().strip()
+                if self.remove_duplicates and email_str in seen_emails:
+                    continue
+                if self._is_junk(email_str) or not self.EMAIL_PATTERN.match(email_str):
+                    continue
+                try:
+                    username, domain = email_str.split('@', 1)
+                    info = EmailInfo(
+                        email=email_str,
+                        username=username,
+                        domain=domain,
+                        source_context="Extracted from mailto link",
+                        confidence_score=1.0  # High confidence for mailto links
+                    )
+                    candidates.append(info)
+                    seen_emails.add(email_str)
+                except ValueError:
+                    pass
+
         # --- STEP 3: Phone Regex Matching ---
         raw_phones = self.PHONE_PATTERN.finditer(clean_text)
         phones = []
@@ -135,15 +166,37 @@ class EmailExtractor:
             phone_str = match.group(0).strip()
             
             # Simple validation to avoid matching purely random IDs (must have enough digits)
-            digit_count = sum(c.isdigit() for c in phone_str)
-            if digit_count < 10 or digit_count > 15:
+            # Remove all non-digit characters for length check
+            digits_only = re.sub(r'\D', '', phone_str)
+            if len(digits_only) < 8 or len(digits_only) > 15:
                 continue
                 
             if phone_str not in seen_phones:
                 phones.append(phone_str)
                 seen_phones.add(phone_str)
 
-        return ContactInfo(emails=candidates, phone_numbers=phones)
+        # --- STEP 4: Social Media Links ---
+        social_links = {}
+        target_text_for_social = html_content if html_content else clean_text
+        social_matches = self.SOCIAL_PATTERN.finditer(target_text_for_social)
+        
+        for match in social_matches:
+            url = match.group(0)
+            domain = match.group(1).lower()
+            
+            # Ensure it's a full URL
+            if not url.startswith('http'):
+                url = 'https://' + url
+                
+            # Map domain to standard keys
+            key = domain.replace('.com', '')
+            if key == 'x': key = 'twitter'
+            if key == 'wa.me': key = 'whatsapp'
+            
+            if key not in social_links:
+                social_links[key] = url
+
+        return ContactInfo(emails=candidates, phone_numbers=phones, social_links=social_links)
 
     def _deobfuscate(self, text: str) -> str:
         """

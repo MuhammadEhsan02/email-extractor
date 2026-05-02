@@ -102,7 +102,10 @@ class EmailCategorizer:
         'real_estate': ['real estate', 'realtor', 'property', 'properties', 'apartments', 'housing', 'mortgage', 'broker', 'listings'],
         'tech': ['software', 'technology', 'tech', 'app', 'platform', 'cloud', 'saas', 'development', 'it services'],
         'medical': ['clinic', 'hospital', 'medical', 'doctor', 'patient', 'health', 'healthcare', 'care', 'treatment'],
-        'fitness': ['gym', 'fitness', 'workout', 'training', 'yoga', 'pilates', 'health club', 'exercise']
+        'fitness': ['gym', 'fitness', 'workout', 'training', 'yoga', 'pilates', 'health club', 'exercise'],
+        'manufacturing': ['manufacturing', 'industrial', 'steel plant', 'factory', 'production', 'machinery', 'assembly', 'plant'],
+        'corporate': ['corporate', 'enterprise', 'holdings', 'group', 'corporation', 'inc', 'llc'],
+        'ecommerce': ['e-commerce', 'ecommerce', 'online store', 'cart', 'checkout']
     }
     
     def __init__(self, 
@@ -248,12 +251,18 @@ class EmailCategorizer:
         best_score = 0
         best_label = 'unknown'
         
+        # Categories that should carry more weight to override generic labels
+        high_weight_categories = {'manufacturing', 'corporate', 'ecommerce'}
+        
         for category, keywords in self.BUSINESS_TYPES_KEYWORDS.items():
             score = 0
             for keyword in keywords:
                 # Use regex strictly to find word boundaries for accuracy
                 pattern = r'\b' + re.escape(keyword) + r'\b'
                 score += len(re.findall(pattern, text_lower))
+                
+            if category in high_weight_categories:
+                score *= 3  # Apply multiplier to high-weight categories
                 
             if score > best_score:
                 best_score = score

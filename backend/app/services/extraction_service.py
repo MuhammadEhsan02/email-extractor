@@ -3,6 +3,7 @@ import asyncio
 import os
 from datetime import datetime
 from typing import List, Dict
+from urllib.parse import urlparse
 
 # Import Models
 from app.models.extract_request import ExtractRequest, ExtractionMode
@@ -97,46 +98,103 @@ class ExtractionService:
 
             extracted_data = []
 
-            # 4. Processing Loop (Concurrently scrape URLs)
-            # Limiting concurrency to avoid resource exhaustion
-            scraped_results = await scraper.scrape_multiple(target_urls, max_concurrent=5)
-
-            for result in scraped_results:
-                if result.status_code == 200 and result.html:
-                    # Parse HTML
-                    parsed_content = parser.parse(result.html, base_url=result.url)
+            # 4. Processing Loop (BFS Crawler per domain)
+            MAX_EMAILS = 5
+            MAX_PAGES_VISITED = 15
+            
+            for base_target in target_urls:
+                queue = [base_target]
+                visited = set()
+                domain_emails_count = 0
+                pages_visited = 0
+                base_domain_added = False
+                
+                while queue and pages_visited < MAX_PAGES_VISITED and domain_emails_count < MAX_EMAILS:
+                    current_url = queue.pop(0)
+                    if current_url in visited:
+                        continue
+                        
+                    visited.add(current_url)
+                    pages_visited += 1
                     
-                    # Extract Contacts
-                    contacts = extractor.extract(parsed_content.text)
-                    business_label = categorizer.predict_business_type(parsed_content.text)
-                    phones_str = ", ".join(contacts.phone_numbers)
+                    # Ensure we don't scrape multiple manually since we use BFS here, 
+                    # we just scrape one by one. User approved the increased time.
+                    result = await scraper.scrape(current_url)
                     
-                    if not contacts.emails and contacts.phone_numbers:
-                        extracted_data.append({
-                            "email": "",
-                            "source_url": result.url,
-                            "domain": result.url,
-                            "confidence": 0.0,
-                            "context": "",
-                            "phone_numbers": phones_str,
-                            "business_label": business_label
-                        })
-                    else:
-                        for email_info in contacts.emails:
+                    parsed_url = urlparse(current_url)
+                    root_domain_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                    
+                    if result.status_code == 200 and result.html:
+                        # Parse HTML
+                        parsed_content = parser.parse(result.html, base_url=result.url)
+                        
+                        # Extract Contacts (passing raw HTML for deep extraction)
+                        contacts = extractor.extract(parsed_content.text, result.html)
+                        business_label = categorizer.predict_business_type(parsed_content.text)
+                        phones_str = ", ".join(contacts.phone_numbers)
+                        
+                        new_emails_found = 0
+                        
+                        if not contacts.emails and contacts.phone_numbers:
                             extracted_data.append({
-                                "email": email_info.email,
+                                "email": "",
                                 "source_url": result.url,
-                                "domain": email_info.domain,
-                                "confidence": email_info.confidence_score,
-                                "context": email_info.source_context[:100] if email_info.source_context else "",
+                                "domain": parsed_url.netloc,
+                                "confidence": 0.0,
+                                "context": "",
                                 "phone_numbers": phones_str,
-                                "business_label": business_label
+                                "business_label": business_label,
+                                "facebook": contacts.social_links.get("facebook", ""),
+                                "instagram": contacts.social_links.get("instagram", ""),
+                                "linkedin": contacts.social_links.get("linkedin", ""),
+                                "twitter": contacts.social_links.get("twitter", ""),
+                                "whatsapp": contacts.social_links.get("whatsapp", "")
                             })
-                    
-                    # Log success for limiter
-                    limiter.record_success(result.url, len(result.html))
-                else:
-                    limiter.record_failure(result.url, result.error or "Unknown error")
+                        else:
+                            for email_info in contacts.emails:
+                                if domain_emails_count >= MAX_EMAILS:
+                                    break
+                                extracted_data.append({
+                                    "email": email_info.email,
+                                    "source_url": result.url,
+                                    "domain": email_info.domain,
+                                    "confidence": email_info.confidence_score,
+                                    "context": email_info.source_context[:100] if email_info.source_context else "",
+                                    "phone_numbers": phones_str,
+                                    "business_label": business_label,
+                                    "facebook": contacts.social_links.get("facebook", ""),
+                                    "instagram": contacts.social_links.get("instagram", ""),
+                                    "linkedin": contacts.social_links.get("linkedin", ""),
+                                    "twitter": contacts.social_links.get("twitter", ""),
+                                    "whatsapp": contacts.social_links.get("whatsapp", "")
+                                })
+                                domain_emails_count += 1
+                                new_emails_found += 1
+                        
+                        # Log success for limiter
+                        limiter.record_success(result.url, len(result.html))
+                        
+                        # Base URL Fallback
+                        if pages_visited == 1 and new_emails_found == 0 and not base_domain_added and root_domain_url != current_url:
+                            if root_domain_url not in visited and root_domain_url not in queue:
+                                queue.append(root_domain_url)
+                                base_domain_added = True
+                                
+                        # Add links to queue if in deep mode
+                        mode_str = getattr(request.mode, "value", request.mode)
+                        if str(mode_str).lower() == 'deep' and domain_emails_count < MAX_EMAILS:
+                            for link in parsed_content.links:
+                                link_parsed = urlparse(link)
+                                if link_parsed.netloc == parsed_url.netloc and link not in visited and link not in queue:
+                                    queue.append(link)
+                                    
+                    else:
+                        limiter.record_failure(result.url, result.error or "Unknown error")
+                        # Fallback for failed first request
+                        if pages_visited == 1 and not base_domain_added and root_domain_url != current_url:
+                            if root_domain_url not in visited and root_domain_url not in queue:
+                                queue.append(root_domain_url)
+                                base_domain_added = True
 
             logger.info(f"Job {job_id}: Extracted {len(extracted_data)} contacts.")
 

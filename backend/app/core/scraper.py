@@ -10,6 +10,7 @@ Author: Email Extraction System
 import asyncio
 import aiohttp
 import time
+import random
 from typing import Optional, Dict, List
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
@@ -183,14 +184,20 @@ class WebScraper:
             respect_robots: Whether to respect robots.txt
             max_page_size: Maximum page size to download (bytes)
         """
-        self.user_agent = user_agent
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+        ]
         self.timeout = timeout
         self.max_retries = max_retries
         self.max_page_size = max_page_size
         self.respect_robots = respect_robots
         
         self.rate_limiter = RateLimiter(min_delay=rate_limit_delay)
-        self.robots_checker = RobotsChecker(user_agent=user_agent)
+        # Use a random user agent for the robots checker as well
+        self.robots_checker = RobotsChecker(user_agent=random.choice(self.user_agents))
         
         # Statistics
         self.total_requests = 0
@@ -217,8 +224,8 @@ class WebScraper:
         # Create session with custom settings
         timeout_obj = aiohttp.ClientTimeout(total=self.timeout)
         headers = {
-            'User-Agent': self.user_agent,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'User-Agent': random.choice(self.user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate',
             'DNT': '1',
